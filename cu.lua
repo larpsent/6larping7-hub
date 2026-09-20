@@ -1,3 +1,5 @@
+local ScriptURL = "https://raw.githubusercontent.com/larpsent/6larping7-hub/refs/heads/main/cu.lua"
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local RS     = game:GetService("ReplicatedStorage")
@@ -16,9 +18,9 @@ local AutoHatch   = false
 local FastHatch   = false
 local SelectedEgg = "Atlantean Egg"
 local HatchMode   = "Triple"
-local RebirthAt   = 1  -- rebirth count to fire
+local RebirthAt   = 1
 
--- ─── Rebirth tiers (amount to pass FireServer) ───────────────────────────────
+-- ─── Rebirth tiers ────────────────────────────────────────────────────────────
 local RebirthTiers = {
     ["1 Rebirth"]     = 1,
     ["5 Rebirths"]    = 5,
@@ -51,27 +53,17 @@ local TierNames = {
 
 -- ─── Number parser ────────────────────────────────────────────────────────────
 local suffixes = {
-    K  = 1e3,  M  = 1e6,  B  = 1e9,  T  = 1e12,
+    K = 1e3, M = 1e6, B = 1e9, T = 1e12,
     Qd = 1e15, Qn = 1e18, Sx = 1e21, Sp = 1e24,
 }
-
 local function ParseNumber(str)
     if not str then return 0 end
-    str = tostring(str):gsub(",", ""):gsub(" ", "")
+    str = tostring(str):gsub(",",""):gsub(" ","")
     local plain = tonumber(str)
     if plain then return plain end
     for suffix, mult in pairs(suffixes) do
         local num = str:match("^([%d%.]+)" .. suffix .. "$")
         if num then return tonumber(num) * mult end
-    end
-    return 0
-end
-
-local function GetRebirths()
-    local ls = player:FindFirstChild("leaderstats")
-    if ls then
-        local stat = ls:FindFirstChild("🌀 Rebirths")
-        if stat then return ParseNumber(stat.Value) end
     end
     return 0
 end
@@ -88,14 +80,13 @@ local function GetEggList()
     if #eggs == 0 then eggs = {"Atlantean Egg"} end
     return eggs
 end
-
 local eggList = GetEggList()
 
 -- ─── Window ───────────────────────────────────────────────────────────────────
 local Window = Rayfield:CreateWindow({
     Name = "6larping7 Hub",
     LoadingTitle = "6larping7 Hub",
-    LoadingSubtitle = "by IlikeBigBootyLatinas",
+    LoadingSubtitle = "by apple sauce",
     Theme = "Default",
     DisableRayfieldPrompts = true,
     DisableBuildWarnings = true,
@@ -105,7 +96,6 @@ local Window = Rayfield:CreateWindow({
 local MainTab = Window:CreateTab("Main", 4483362458)
 
 MainTab:CreateSection("Auto Clicker")
-
 MainTab:CreateToggle({
     Name = "Auto Click",
     CurrentValue = false,
@@ -114,14 +104,12 @@ MainTab:CreateToggle({
 })
 
 MainTab:CreateSection("Auto Rebirth")
-
 MainTab:CreateToggle({
     Name = "Auto Rebirth",
     CurrentValue = false,
     Flag = "AutoRebirth",
     Callback = function(v) AutoRebirth = v end,
 })
-
 MainTab:CreateDropdown({
     Name = "Rebirth Tier",
     Options = TierNames,
@@ -132,7 +120,6 @@ MainTab:CreateDropdown({
         RebirthAt = RebirthTiers[tier] or 1
     end,
 })
-
 MainTab:CreateButton({
     Name = "Rebirth Now",
     Callback = function()
@@ -143,25 +130,36 @@ MainTab:CreateButton({
 MainTab:CreateSection("Info")
 local RebirthLabel = MainTab:CreateLabel("Rebirths: loading...")
 
+MainTab:CreateSection("Script")
+MainTab:CreateButton({
+    Name = "Reinject / Reload",
+    Callback = function()
+        AutoClick   = false
+        AutoRebirth = false
+        AutoHatch   = false
+        task.wait(0.2)
+        Rayfield:Destroy()
+        task.wait(0.3)
+        loadstring(game:HttpGet(ScriptURL, true))()
+    end,
+})
+
 -- ─── Hatch Tab ────────────────────────────────────────────────────────────────
 local HatchTab = Window:CreateTab("Hatch", 4483362458)
 
 HatchTab:CreateSection("Auto Hatch")
-
 HatchTab:CreateToggle({
     Name = "Auto Hatch",
     CurrentValue = false,
     Flag = "AutoHatch",
     Callback = function(v) AutoHatch = v end,
 })
-
 HatchTab:CreateToggle({
     Name = "Fast Hatch",
     CurrentValue = false,
     Flag = "FastHatch",
     Callback = function(v) FastHatch = v end,
 })
-
 HatchTab:CreateDropdown({
     Name = "Select Egg",
     Options = eggList,
@@ -171,7 +169,6 @@ HatchTab:CreateDropdown({
         SelectedEgg = type(v) == "table" and v[1] or v
     end,
 })
-
 HatchTab:CreateDropdown({
     Name = "Hatch Mode",
     Options = {"Single", "Triple"},
@@ -181,7 +178,6 @@ HatchTab:CreateDropdown({
         HatchMode = type(v) == "table" and v[1] or v
     end,
 })
-
 HatchTab:CreateButton({
     Name = "Hatch Now",
     Callback = function()
@@ -191,7 +187,6 @@ HatchTab:CreateButton({
         end)
     end,
 })
-
 HatchTab:CreateButton({
     Name = "Refresh Egg List",
     Callback = function()
@@ -204,33 +199,40 @@ HatchTab:CreateButton({
     end,
 })
 
--- ─── Loop ─────────────────────────────────────────────────────────────────────
-local t = 0
-RunS.Heartbeat:Connect(function()
-    t += 1
-
-    if AutoClick then
-        pcall(function() ClickEvent:FireServer() end)
+-- ─── Threads ──────────────────────────────────────────────────────────────────
+task.spawn(function()
+    while true do
+        if AutoClick then
+            pcall(function() ClickEvent:FireServer() end)
+        end
+        task.wait()
     end
+end)
 
-    if AutoHatch and t % 15 == 0 then
-        pcall(function()
-            if FastHatch then HatchDone:FireServer() end
-            HatchEvent:FireServer(SelectedEgg, HatchMode)
-        end)
+task.spawn(function()
+    while true do
+        if AutoRebirth then
+            pcall(function() RebirthEvent:FireServer(RebirthAt) end)
+        end
+        task.wait()
     end
+end)
 
-    -- Auto Rebirth — fires when clicks are enough for selected tier
-    if AutoRebirth and t % 60 == 0 then
-        pcall(function()
-            local current = GetRebirths()
-            -- fire if we have rebirths available (clicks met threshold server-side)
-            RebirthEvent:FireServer(RebirthAt)
-        end)
+task.spawn(function()
+    while true do
+        if AutoHatch then
+            pcall(function()
+                if FastHatch then HatchDone:FireServer() end
+                HatchEvent:FireServer(SelectedEgg, HatchMode)
+            end)
+        end
+        task.wait(0.1)
     end
+end)
 
-    -- Update label every 2s
-    if t % 120 == 0 then
+task.spawn(function()
+    while true do
+        task.wait(2)
         pcall(function()
             local ls = player:FindFirstChild("leaderstats")
             if ls then
@@ -241,8 +243,6 @@ RunS.Heartbeat:Connect(function()
             end
         end)
     end
-
-    if t >= 10000 then t = 0 end
 end)
 
 Rayfield:LoadConfiguration()
