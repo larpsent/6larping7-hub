@@ -232,11 +232,19 @@ task.spawn(function()
     while true do
         if AutoHatch then
             pcall(function()
-                if FastHatch then HatchDone:FireServer() end
+                if FastHatch then
+                    HatchDone:FireServer()
+                end
                 HatchEvent:FireServer(SelectedEgg, HatchMode)
             end)
+            if FastHatch then
+                task.wait(0) -- skip anim, minimal cooldown
+            else
+                task.wait(2.7) -- matches game's exact 2.7s hatch speed
+            end
+        else
+            task.wait(0.5)
         end
-        task.wait(0.1)
     end
 end)
 
