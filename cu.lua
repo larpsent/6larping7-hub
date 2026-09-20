@@ -144,6 +144,16 @@ MainTab:CreateButton({
     end,
 })
 
+MainTab:CreateSection("Anti AFK")
+MainTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true, -- on by default
+    Flag = "AntiAFK",
+    Callback = function(v)
+        -- toggling handled in the thread below
+    end,
+})
+
 -- ─── Hatch Tab ────────────────────────────────────────────────────────────────
 local HatchTab = Window:CreateTab("Hatch", 4483362458)
 
@@ -228,6 +238,16 @@ task.spawn(function()
         end
         task.wait(0.1)
     end
+end)
+
+task.spawn(function()
+    local VirtualUser = game:GetService("VirtualUser")
+    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        if Toggles and Toggles.AntiAFK and not Toggles.AntiAFK.Value then return end
+        VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        task.wait(1)
+        VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+    end)
 end)
 
 task.spawn(function()
