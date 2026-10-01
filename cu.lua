@@ -238,9 +238,9 @@ task.spawn(function()
                 HatchEvent:FireServer(SelectedEgg, HatchMode)
             end)
             if FastHatch then
-                task.wait(0) -- skip anim, minimal cooldown
+                task.wait(0) 
             else
-                task.wait(2.7) -- matches game's exact 2.7s hatch speed
+                task.wait(0.2)
             end
         else
             task.wait(0.5)
