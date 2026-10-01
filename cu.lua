@@ -12,13 +12,16 @@ local HatchEvent   = RS.Events.Hatch
 local HatchDone    = RS.Events.HatchDone
 
 -- ─── State ───────────────────────────────────────────────────────────────────
-local AutoClick   = false
-local AutoRebirth = false
-local AutoHatch   = false
-local FastHatch   = false
-local SelectedEgg = "Atlantean Egg"
-local HatchMode   = "Triple"
-local RebirthAt   = 1
+local AutoClick    = false
+local AutoRebirth  = false
+local AutoHatch    = false
+local FastHatch    = false
+local AutoFarm     = false  -- clicks + rebirths in one toggle
+local SelectedEgg  = "Atlantean Egg"
+local HatchMode    = "Triple"
+local RebirthAt    = 1
+local ClickDelay   = 0      -- task.wait() arg for click loop
+local RebirthDelay = 0      -- task.wait() arg for rebirth loop
 
 -- ─── Rebirth tiers ────────────────────────────────────────────────────────────
 local RebirthTiers = {
@@ -82,75 +85,134 @@ local function GetEggList()
 end
 local eggList = GetEggList()
 
+-- ─── Stats helper ─────────────────────────────────────────────────────────────
+local function getStat(name)
+    local ls = player:FindFirstChild("leaderstats")
+    if not ls then return nil end
+    local s = ls:FindFirstChild(name)
+    return s and s.Value or nil
+end
+
+local function getRebirths()
+    return getStat("🌀 Rebirths") or 0
+end
+
 -- ─── Window ───────────────────────────────────────────────────────────────────
 local Window = Rayfield:CreateWindow({
-    Name = "6larping7 Hub",
-    LoadingTitle = "6larping7 Hub",
-    LoadingSubtitle = "by apple sauce",
-    Theme = "Default",
-    DisableRayfieldPrompts = true,
-    DisableBuildWarnings = true,
+    Name             = "6larping7 Hub",
+    LoadingTitle     = "6larping7 Hub",
+    LoadingSubtitle  = "by apple sauce",
+    Theme            = "Default",
+    KeySystem        = true,   -- no key, just sets keybind below
+    KeySettings      = {
+        Title    = "6larping7 Hub",
+        Subtitle = "Keybind",
+        Note     = "Press Left Control to toggle UI",
+        Key      = {"LeftControl"},
+    },
+    DisableRayfieldPrompts  = true,
+    DisableBuildWarnings    = true,
 })
+
+-- override keybind explicitly after window creation
+-- Rayfield reads this from KeySettings.Key but setting it again is belt+suspenders
+pcall(function()
+    Rayfield.Keybind = Enum.KeyCode.LeftControl
+end)
 
 -- ─── Main Tab ─────────────────────────────────────────────────────────────────
 local MainTab = Window:CreateTab("Main", 4483362458)
 
+-- ── Auto Farm (click + rebirth combined) ──────────────────────────────────────
+MainTab:CreateSection("Auto Farm")
+MainTab:CreateToggle({
+    Name         = "Auto Farm  (Click + Rebirth)",
+    CurrentValue = false,
+    Flag         = "AutoFarm",
+    Callback     = function(v)
+        AutoFarm    = v
+        AutoClick   = v
+        AutoRebirth = v
+    end,
+})
+
+-- ── Auto Clicker ──────────────────────────────────────────────────────────────
 MainTab:CreateSection("Auto Clicker")
 MainTab:CreateToggle({
-    Name = "Auto Click",
+    Name         = "Auto Click",
     CurrentValue = false,
-    Flag = "AutoClick",
-    Callback = function(v) AutoClick = v end,
+    Flag         = "AutoClick",
+    Callback     = function(v)
+        AutoClick = v
+    end,
+})
+MainTab:CreateSlider({
+    Name         = "Click Delay (lower = faster)",
+    Range        = {0, 0.1},
+    Increment    = 0.01,
+    Suffix       = "s",
+    CurrentValue = 0,
+    Flag         = "ClickDelay",
+    Callback     = function(v) ClickDelay = v end,
 })
 
+-- ── Auto Rebirth ──────────────────────────────────────────────────────────────
 MainTab:CreateSection("Auto Rebirth")
 MainTab:CreateToggle({
-    Name = "Auto Rebirth",
+    Name         = "Auto Rebirth",
     CurrentValue = false,
-    Flag = "AutoRebirth",
-    Callback = function(v) AutoRebirth = v end,
+    Flag         = "AutoRebirth",
+    Callback     = function(v) AutoRebirth = v end,
 })
 MainTab:CreateDropdown({
-    Name = "Rebirth Tier",
-    Options = TierNames,
+    Name          = "Rebirth At",
+    Options       = TierNames,
     CurrentOption = {"1 Rebirth"},
-    Flag = "RebirthTier",
-    Callback = function(v)
+    Flag          = "RebirthTier",
+    Callback      = function(v)
         local tier = type(v) == "table" and v[1] or v
-        RebirthAt = RebirthTiers[tier] or 1
+        RebirthAt  = RebirthTiers[tier] or 1
     end,
 })
 MainTab:CreateButton({
-    Name = "Rebirth Now",
+    Name     = "Rebirth Now",
     Callback = function()
         pcall(function() RebirthEvent:FireServer(RebirthAt) end)
+        Rayfield:Notify({
+            Title    = "Rebirth",
+            Content  = "Fired rebirth at " .. RebirthAt,
+            Duration = 2,
+        })
     end,
 })
 
-MainTab:CreateSection("Info")
+-- ── Stats ─────────────────────────────────────────────────────────────────────
+MainTab:CreateSection("Stats")
 local RebirthLabel = MainTab:CreateLabel("Rebirths: loading...")
+local ClicksLabel  = MainTab:CreateLabel("Clicks: loading...")
 
+-- ── Anti AFK ──────────────────────────────────────────────────────────────────
+MainTab:CreateSection("Anti AFK")
+MainTab:CreateToggle({
+    Name         = "Anti AFK",
+    CurrentValue = true,
+    Flag         = "AntiAFK",
+    Callback     = function(_) end,
+})
+
+-- ── Script ────────────────────────────────────────────────────────────────────
 MainTab:CreateSection("Script")
 MainTab:CreateButton({
-    Name = "Reinject / Reload",
+    Name     = "Reinject / Reload",
     Callback = function()
         AutoClick   = false
         AutoRebirth = false
         AutoHatch   = false
+        AutoFarm    = false
         task.wait(0.2)
         Rayfield:Destroy()
         task.wait(0.3)
         loadstring(game:HttpGet(ScriptURL, true))()
-    end,
-})
-
-MainTab:CreateSection("Anti AFK")
-MainTab:CreateToggle({
-    Name = "Anti AFK",
-    CurrentValue = true, -- on by default
-    Flag = "AntiAFK",
-    Callback = function(v)
-        -- toggling handled in the thread below
     end,
 })
 
@@ -159,98 +221,109 @@ local HatchTab = Window:CreateTab("Hatch", 4483362458)
 
 HatchTab:CreateSection("Auto Hatch")
 HatchTab:CreateToggle({
-    Name = "Auto Hatch",
+    Name         = "Auto Hatch",
     CurrentValue = false,
-    Flag = "AutoHatch",
-    Callback = function(v) AutoHatch = v end,
+    Flag         = "AutoHatch",
+    Callback     = function(v) AutoHatch = v end,
 })
 HatchTab:CreateToggle({
-    Name = "Fast Hatch",
+    Name         = "Fast Hatch",
     CurrentValue = false,
-    Flag = "FastHatch",
-    Callback = function(v) FastHatch = v end,
+    Flag         = "FastHatch",
+    Callback     = function(v) FastHatch = v end,
 })
 HatchTab:CreateDropdown({
-    Name = "Select Egg",
-    Options = eggList,
+    Name          = "Select Egg",
+    Options       = eggList,
     CurrentOption = {eggList[1]},
-    Flag = "EggPicker",
-    Callback = function(v)
+    Flag          = "EggPicker",
+    Callback      = function(v)
         SelectedEgg = type(v) == "table" and v[1] or v
     end,
 })
 HatchTab:CreateDropdown({
-    Name = "Hatch Mode",
-    Options = {"Single", "Triple"},
+    Name          = "Hatch Mode",
+    Options       = {"Single", "Triple"},
     CurrentOption = {"Triple"},
-    Flag = "HatchMode",
-    Callback = function(v)
+    Flag          = "HatchMode",
+    Callback      = function(v)
         HatchMode = type(v) == "table" and v[1] or v
     end,
 })
 HatchTab:CreateButton({
-    Name = "Hatch Now",
+    Name     = "Hatch Now",
     Callback = function()
         pcall(function()
             if FastHatch then HatchDone:FireServer() end
             HatchEvent:FireServer(SelectedEgg, HatchMode)
         end)
+        Rayfield:Notify({
+            Title    = "Hatch",
+            Content  = "Hatching " .. SelectedEgg .. " (" .. HatchMode .. ")",
+            Duration = 2,
+        })
     end,
 })
 HatchTab:CreateButton({
-    Name = "Refresh Egg List",
+    Name     = "Refresh Egg List",
     Callback = function()
         eggList = GetEggList()
         Rayfield:Notify({
-            Title = "Egg List",
-            Content = "Found " .. #eggList .. " eggs",
+            Title    = "Egg List",
+            Content  = "Found " .. #eggList .. " eggs",
             Duration = 3,
         })
     end,
 })
 
 -- ─── Threads ──────────────────────────────────────────────────────────────────
+
+-- click loop
 task.spawn(function()
     while true do
         if AutoClick then
             pcall(function() ClickEvent:FireServer() end)
+            task.wait(ClickDelay)
+        else
+            task.wait(0)
         end
-        task.wait()
     end
 end)
 
+-- rebirth loop — checks current rebirths against threshold
 task.spawn(function()
     while true do
         if AutoRebirth then
-            pcall(function() RebirthEvent:FireServer(RebirthAt) end)
+            pcall(function()
+                local current = getRebirths()
+                if current >= RebirthAt then
+                    RebirthEvent:FireServer(RebirthAt)
+                end
+            end)
         end
-        task.wait()
+        task.wait(0.1) -- check every 100ms, not every frame
     end
 end)
 
+-- hatch loop
 task.spawn(function()
     while true do
         if AutoHatch then
             pcall(function()
-                if FastHatch then
-                    HatchDone:FireServer()
-                end
+                if FastHatch then HatchDone:FireServer() end
                 HatchEvent:FireServer(SelectedEgg, HatchMode)
             end)
-            if FastHatch then
-                task.wait(0) 
-            else
-                task.wait(0.2)
-            end
+            task.wait(FastHatch and 0 or 2.7)
         else
             task.wait(0.5)
         end
     end
 end)
 
+-- anti afk
 task.spawn(function()
     local VirtualUser = game:GetService("VirtualUser")
-    game:GetService("Players").LocalPlayer.Idled:Connect(function()
+    player.Idled:Connect(function()
         if Toggles and Toggles.AntiAFK and not Toggles.AntiAFK.Value then return end
         VirtualUser:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
         task.wait(1)
@@ -258,19 +331,27 @@ task.spawn(function()
     end)
 end)
 
+-- stats label updater
 task.spawn(function()
     while true do
-        task.wait(2)
+        task.wait(1)
         pcall(function()
-            local ls = player:FindFirstChild("leaderstats")
-            if ls then
-                local stat = ls:FindFirstChild("🌀 Rebirths")
-                if stat then
-                    RebirthLabel:Set("Current Rebirths: " .. tostring(stat.Value))
-                end
-            end
+            local rebirths = getRebirths()
+            RebirthLabel:Set("🌀 Rebirths: " .. tostring(rebirths))
+
+            -- try common click stat names
+            local clicks = getStat("💎 Clicks") or getStat("Clicks") or getStat("💰 Coins") or "?"
+            ClicksLabel:Set("💎 Clicks: " .. tostring(clicks))
         end)
     end
 end)
+
+-- notify on load
+task.wait(1)
+Rayfield:Notify({
+    Title    = "6larping7 Hub",
+    Content  = "Loaded — Left Control to toggle UI",
+    Duration = 4,
+})
 
 Rayfield:LoadConfiguration()
