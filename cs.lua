@@ -1,4 +1,4 @@
-local ScriptURL = "https://raw.githubusercontent.com/larpsent/6larping7-hub/refs/heads/main/hub.lua"
+local ScriptURL = "https://raw.githubusercontent.com/larpsent/6larping7-hub/refs/heads/main/cs.lua"
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
